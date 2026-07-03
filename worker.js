@@ -1,55 +1,44 @@
 export default {
-  async fetch(request) {
+  async fetch(request, env) {
     const url = new URL(request.url);
 
-    // API: /api/channel?id=CHANNEL_ID
-    if (url.pathname === "/api/channel") {
-      const channelId = url.searchParams.get("id");
+    // API endpoint
+    if (url.pathname === "/api/home") {
+      const channels = [
+        "UCFAiFyGs6oDiF1Nf-rRJpZA", // Technoblade example
+        "UCX6OQ3DkcsbYNE6H8uQQuVA"  // MrBeast example
+      ];
 
-      if (!channelId) {
-        return Response.json({
-          error: "Missing channel id"
-        }, {
-          status: 400
-        });
-      }
+      const videos = [];
 
-      try {
-        const rss = await fetch(
-          `https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`,
-          {
-            headers: {
-              "User-Agent": "HorizenVideos"
-            }
-          }
-        );
+      for (const id of channels) {
+        const feedUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${id}`;
+        const res = await fetch(feedUrl);
+        const text = await res.text();
 
-        if (!rss.ok) {
-          return Response.json({
-            error: "Unable to fetch RSS"
-          }, {
-            status: rss.status
+        const items = [...text.matchAll(/<entry>([\s\S]*?)<\/entry>/g)];
+
+        for (const item of items.slice(0, 3)) {
+          const block = item[1];
+
+          const title = block.match(/<title>(.*?)<\/title>/)?.[1] || "Untitled";
+          const videoId = block.match(/<yt:videoId>(.*?)<\/yt:videoId>/)?.[1];
+          const published = block.match(/<published>(.*?)<\/published>/)?.[1];
+          const thumbnail = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+
+          videos.push({
+            title,
+            videoId,
+            published,
+            thumbnail,
+            channel: id
           });
         }
-
-        return new Response(await rss.text(), {
-          headers: {
-            "Content-Type": "application/xml",
-            "Access-Control-Allow-Origin": "*",
-            "Cache-Control": "public, max-age=300"
-          }
-        });
-
-      } catch (err) {
-        return Response.json({
-          error: err.message
-        }, {
-          status: 500
-        });
       }
+
+      return Response.json({ videos });
     }
 
-    // Let Cloudflare serve frontend files
-    return fetch(request);
+    return new Response("HorizonVideos Worker Running", { status: 200 });
   }
 };
