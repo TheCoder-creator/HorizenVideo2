@@ -1,1 +1,25 @@
 
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HorizenVideos</title>
+<style>
+body{margin:0;font-family:Segoe UI,Arial;background:#0b1220;color:#fff}
+header{padding:18px 24px;display:flex;justify-content:space-between;align-items:center;background:#10192d;position:sticky;top:0}
+.logo{font-size:28px;font-weight:700;color:#4ea1ff}
+#search{width:min(600px,70vw);padding:12px;border-radius:30px;border:none;background:#1b2742;color:#fff}
+main{max-width:1200px;margin:auto;padding:24px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:20px}
+.card{background:#15213b;border-radius:16px;overflow:hidden;transition:.2s}
+.card:hover{transform:translateY(-4px)}
+.card img{width:100%;display:block}
+.info{padding:14px}
+.small{color:#9db1d4;font-size:.9em}
+</style></head>
+<body>
+<header><div class="logo">HorizenVideos</div><input id="search" placeholder="Search channels..."></header>
+<main>
+<h2>Latest Videos</h2>
+<div id="videos" class="grid"></div>
+</main>
+<script src="app.js"></script>
+</body></html>
