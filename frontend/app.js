@@ -1,87 +1,43 @@
-const CHANNEL_ID = "UCFAiFyGs6oDiF1Nf-rRJpZA";
+const API = "/api/home";
 
 async function load() {
-    const container = document.getElementById("videos");
+  const container = document.getElementById("videos");
+  container.innerHTML = "<p>Loading...</p>";
 
-    container.innerHTML = `
-        <div class="loading">
-            Loading videos...
-        </div>
+  const res = await fetch(API);
+  const data = await res.json();
+
+  container.innerHTML = "";
+
+  data.videos.forEach(v => {
+    const div = document.createElement("div");
+    div.className = "card";
+
+    div.innerHTML = `
+      <img src="${v.thumbnail}">
+      <div class="info">
+        <b>${v.title}</b>
+        <div class="small">${new Date(v.published).toDateString()}</div>
+      </div>
     `;
 
-    try {
-        const response = await fetch(`/api/channel?id=${CHANNEL_ID}`);
+    div.onclick = () => openVideo(v.videoId);
 
-        if (!response.ok) {
-            throw new Error("Failed to fetch feed");
-        }
+    container.appendChild(div);
+  });
+}
 
-        const xml = await response.text();
+function openVideo(id) {
+  const player = document.getElementById("player");
+  const frame = document.getElementById("frame");
 
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(xml, "application/xml");
+  frame.src = `https://www.youtube.com/embed/${id}?autoplay=1`;
+  player.style.display = "flex";
+}
 
-        const entries = [...doc.getElementsByTagName("entry")];
-
-        container.innerHTML = "";
-
-        entries.forEach(entry => {
-
-            const title =
-                entry.getElementsByTagName("title")[0]?.textContent ??
-                "Untitled";
-
-            const videoId =
-                entry.getElementsByTagName("yt:videoId")[0]?.textContent ??
-                "";
-
-            const published =
-                entry.getElementsByTagName("published")[0]?.textContent ??
-                "";
-
-            const author =
-                entry.getElementsByTagName("name")[0]?.textContent ??
-                "Unknown";
-
-            const card = document.createElement("div");
-            card.className = "card";
-
-            card.innerHTML = `
-                <a href="https://www.youtube.com/watch?v=${videoId}" target="_blank">
-                    <img src="https://i.ytimg.com/vi/${videoId}/hqdefault.jpg">
-                </a>
-
-                <div class="info">
-                    <h3>${title}</h3>
-
-                    <div class="small">
-                        ${author}
-                    </div>
-
-                    <div class="small">
-                        ${new Date(published).toLocaleDateString()}
-                    </div>
-                </div>
-            `;
-
-            container.appendChild(card);
-
-        });
-
-        if (entries.length === 0) {
-            container.innerHTML = `
-                <p>No videos found.</p>
-            `;
-        }
-
-    } catch (err) {
-
-        console.error(err);
-
-        container.innerHTML = `
-            <p>Unable to load videos.</p>
-        `;
-    }
+function closePlayer() {
+  document.getElementById("player").style.display = "none";
+  document.getElementById("frame").src = "";
 }
 
 load();
