@@ -336,12 +336,38 @@ main{
 <script>
 // ===============================
 // PUT YOUR API KEY HERE
+// (generate a NEW one — the old key was exposed)
 // ===============================
 const API_KEY = "AIzaSyDgir7W26YD_PaZjbxU2iWYTZhW4Vf_n84";
 // ===============================
-const REGION_CODE = "US";
+const DEFAULT_REGION = "US";
+
+function getParam(name){
+    return new URLSearchParams(location.search).get(name);
+}
+
+function normalizeRegion(code){
+    code = (code || "").trim().toUpperCase();
+    return /^[A-Z]{2}$/.test(code) ? code : DEFAULT_REGION;
+}
+
+let REGION_CODE = normalizeRegion(getParam("region"));
 
 const PLAY_ICON = `<svg viewBox="0 0 24 24" fill="#fff"><circle cx="12" cy="12" r="12" fill="rgba(255,255,255,.15)"/><path d="M9.5 7.5v9l8-4.5z"/></svg>`;
+
+function updateUrl(updates, replace = false){
+    const p = new URLSearchParams(location.search);
+    for(const [key, value] of Object.entries(updates)){
+        if(value === null || value === undefined || value === ""){
+            p.delete(key);
+        }else{
+            p.set(key, value);
+        }
+    }
+    const qs = p.toString();
+    const url = location.pathname + (qs ? "?" + qs : "");
+    history[replace ? "replaceState" : "pushState"]({}, "", url);
+}
 
 function parseDurationToSeconds(iso){
     const match = iso.match(/PT(\d+H)?(\d+M)?(\d+S)?/);
@@ -371,7 +397,7 @@ function makeCard(video, isShort){
             <div class="channel">${channel}</div>
         </div>
     `;
-    card.onclick = () => playVideo(videoId);
+    card.onclick = () => playVideo(videoId, true);
     return card;
 }
 
@@ -403,8 +429,8 @@ async function loadHomepage(){
         if(shortVideos.length >= 6){
             renderGrid(shortsEl, shortVideos.slice(0, 12), true, "No trending shorts found.");
         }else{
-            // Fallback: YouTube has no dedicated "trending shorts" chart, so
-            // approximate it with the most-viewed short-form videos right now.
+            // YouTube has no dedicated "trending shorts" chart, so approximate
+            // it with the most-viewed short-form videos in the region.
             const shortsUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoDuration=short&order=viewCount&maxResults=12&regionCode=${REGION_CODE}&q=shorts&key=${API_KEY}`;
             const sRes = await fetch(shortsUrl);
             const sData = await sRes.json();
@@ -430,19 +456,13 @@ function renderGrid(container, videos, isShort, emptyMsg){
     videos.forEach(video => container.appendChild(makeCard(video, isShort)));
 }
 
-async function searchVideos(){
-    const query = document.getElementById("query").value.trim();
-    if(query === ""){
-        alert("Enter a search term");
-        return;
-    }
+async function runSearch(query, push = true){
     document.getElementById("home-section").style.display = "none";
-    const searchSection = document.getElementById("search-section");
-    searchSection.style.display = "block";
+    document.getElementById("search-section").style.display = "block";
     const results = document.getElementById("results");
     results.innerHTML = "<div class='state-msg'>Searching...</div>";
 
-    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=16&q=${encodeURIComponent(query)}&key=${API_KEY}`;
+    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=16&regionCode=${REGION_CODE}&q=${encodeURIComponent(query)}&key=${API_KEY}`;
     try{
         const response = await fetch(url);
         const data = await response.json();
@@ -452,22 +472,63 @@ async function searchVideos(){
         console.error(error);
         results.innerHTML = `<p class="state-msg" style="color:var(--coral)">${error.message}</p>`;
     }
+    if(push) updateUrl({ q: query, v: null });
 }
 
-function goHome(){
+function searchVideos(){
+    const query = document.getElementById("query").value.trim();
+    if(query === ""){
+        alert("Enter a search term");
+        return;
+    }
+    runSearch(query, true);
+}
+
+function goHome(push = true){
     document.getElementById("query").value = "";
     document.getElementById("search-section").style.display = "none";
     document.getElementById("home-section").style.display = "block";
+    document.getElementById("player-container").style.display = "none";
+    document.getElementById("player").src = "";
     window.scrollTo({ top: 0, behavior: "smooth" });
+    if(push) updateUrl({ q: null, v: null });
 }
 
-function playVideo(videoId){
+function playVideo(videoId, push = true){
     document.getElementById("player").src = `https://www.youtube.com/embed/${videoId}?autoplay=1`;
     document.getElementById("player-container").style.display = "block";
     window.scrollTo({ top: 0, behavior: "smooth" });
+    if(push) updateUrl({ v: videoId, q: null });
 }
 
-loadHomepage();
+async function applyParams(){
+    const v = getParam("v");
+    const q = getParam("q");
+    if(v){
+        playVideo(v, false);
+    }else if(q){
+        document.getElementById("query").value = q;
+        await runSearch(q, false);
+    }else{
+        goHome(false);
+    }
+}
+
+window.addEventListener("popstate", async () => {
+    const newRegion = normalizeRegion(getParam("region"));
+    if(newRegion !== REGION_CODE){
+        REGION_CODE = newRegion;
+        document.getElementById("trending-results").innerHTML = "<div class='state-msg'>Loading trending videos...</div>";
+        document.getElementById("shorts-results").innerHTML = "<div class='state-msg'>Loading trending shorts...</div>";
+        await loadHomepage();
+    }
+    applyParams();
+});
+
+(async function init(){
+    await loadHomepage();
+    await applyParams();
+})();
 </script>
 </body>
 </html>
